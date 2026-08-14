@@ -102,12 +102,10 @@ const emailWorker = new Worker(
       throw awsError; // Re-throw so BullMQ flags the job as failed
     }
 
-    // Update lead status in MongoDB to 'Sent'
-    if (lead) {
-      lead.status = 'Sent';
-      await lead.save();
-    } else if (leadId) {
-      await Lead.findByIdAndUpdate(leadId, { status: 'Sent' });
+    // Update lead status in MongoDB to 'Sent' right after sending
+    if (targetLeadId) {
+      await Lead.findByIdAndUpdate(targetLeadId, { status: 'Sent' });
+      console.log(`[Worker] Updated lead ${targetLeadId} status to 'Sent' in MongoDB`);
     }
 
     return {

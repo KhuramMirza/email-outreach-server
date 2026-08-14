@@ -223,14 +223,12 @@ const getLeadStats = async () => {
  */
 const trackLeadOpen = async (leadId) => {
   try {
-    const lead = await Lead.findById(leadId);
-    if (lead) {
-      if (lead.status === 'Sent' || lead.status === 'Uncontacted' || lead.status === 'Queued') {
-        lead.status = 'Opened';
-        await lead.save();
-        console.log(`[Open Tracker] Lead ${leadId} (${lead.email}) status updated to 'Opened'`);
+    if (leadId) {
+      const updatedLead = await Lead.findByIdAndUpdate(leadId, { status: 'Opened' }, { new: true });
+      if (updatedLead) {
+        console.log(`[Open Tracker] Lead ${leadId} (${updatedLead.email}) status updated to 'Opened'`);
       }
-      return lead;
+      return updatedLead;
     }
   } catch (err) {
     console.error(`[Open Tracker Error] Failed to update lead ${leadId}:`, err.message);
@@ -239,7 +237,7 @@ const trackLeadOpen = async (leadId) => {
 };
 
 /**
- * Create/find a test lead and enqueue a test email job in BullMQ
+ * Create/find a test lead, await saving to MongoDB, then enqueue a test email job in BullMQ
  * @param {string} email
  * @param {string} subject
  * @param {string} body
@@ -250,12 +248,13 @@ const sendTestEmail = async (email, subject, body) => {
   let lead = await Lead.findOne({ email: cleanEmail });
 
   if (!lead) {
-    lead = await createLead({
+    lead = new Lead({
       email: cleanEmail,
       niche: 'Manual Test',
       companyName: 'Test Account',
       status: 'Uncontacted',
     });
+    await lead.save();
   }
 
   const job = await emailQueue.add('send-email', {
@@ -267,7 +266,7 @@ const sendTestEmail = async (email, subject, body) => {
     templateBody: body,
   });
 
-  console.log(`[Manual Test] Enqueued test email job ${job.id} for lead ${lead._id} (${cleanEmail})`);
+  console.log(`[Manual Test] Saved lead ${lead._id} and enqueued test email job ${job.id} for ${cleanEmail}`);
 
   return {
     lead,
@@ -283,6 +282,7 @@ module.exports = {
   trackLeadOpen,
   sendTestEmail,
 };
+
 
 
 
