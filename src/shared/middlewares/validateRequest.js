@@ -29,9 +29,10 @@ const validateRequest = (schema) => async (req, res, next) => {
     }
     next();
   } catch (error) {
-    if (error instanceof ZodError || error.name === 'ZodError') {
-      const formattedErrors = error.errors.map((err) => ({
-        field: err.path.join('.'),
+    if (error instanceof ZodError || (error && (Array.isArray(error.errors) || Array.isArray(error.issues)))) {
+      const issues = error.errors || error.issues || [];
+      const formattedErrors = issues.map((err) => ({
+        field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || ''),
         message: err.message,
       }));
 
