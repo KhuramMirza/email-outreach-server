@@ -28,7 +28,7 @@ const VERIFIED_SENDER_EMAIL = process.env.SENDER_EMAIL || 'mirzakhuram101@gmail.
 const emailWorker = new Worker(
   'email-queue',
   async (job) => {
-    const { leadId, templateBody, subject, recipientEmail } = job.data;
+    const { leadId, templateBody, body, subject, recipientEmail } = job.data;
     console.log(`[Worker] Processing job ${job.id} for lead ${leadId}`);
 
     let lead;
@@ -46,12 +46,35 @@ const emailWorker = new Worker(
       throw new Error(`Target email address not found for leadId: ${leadId}`);
     }
 
+    let mailSubject = subject || 'Outreach Email';
+    let mailContent = body || templateBody || '<p>Outreach Message</p>';
+
+    // Dynamic variable substitution based on lead data
+    if (lead) {
+      const companyVal = lead.companyName || lead.website || 'there';
+      const emailVal = lead.email || targetEmail;
+      const nicheVal = lead.niche || 'your industry';
+      const websiteVal = lead.website || '';
+
+      mailSubject = mailSubject
+        .replace(/\{\{\s*companyName\s*\}\}/gi, companyVal)
+        .replace(/\{\{\s*email\s*\}\}/gi, emailVal)
+        .replace(/\{\{\s*niche\s*\}\}/gi, nicheVal)
+        .replace(/\{\{\s*website\s*\}\}/gi, websiteVal);
+
+      mailContent = mailContent
+        .replace(/\{\{\s*companyName\s*\}\}/gi, companyVal)
+        .replace(/\{\{\s*email\s*\}\}/gi, emailVal)
+        .replace(/\{\{\s*niche\s*\}\}/gi, nicheVal)
+        .replace(/\{\{\s*website\s*\}\}/gi, websiteVal);
+    }
+
     // Prepare email options
     const mailOptions = {
       from: VERIFIED_SENDER_EMAIL,
       to: targetEmail,
-      subject: subject || 'Outreach Email',
-      html: templateBody || '<p>Outreach Message</p>',
+      subject: mailSubject,
+      html: mailContent,
     };
 
     let info;

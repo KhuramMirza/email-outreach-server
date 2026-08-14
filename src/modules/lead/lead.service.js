@@ -47,7 +47,7 @@ const isTargetWebsite = (url) => {
  * @param {string} query - Search term / niche
  * @returns {Promise<Object>} Scraping summary & created leads
  */
-const scrapeLeads = async (query) => {
+const scrapeLeads = async (query, subject, body) => {
   console.log(`[Serper Scraper] Initiating Google search via Serper API for query: "${query}"...`);
 
   const targetUrls = [];
@@ -148,7 +148,10 @@ const scrapeLeads = async (query) => {
       // Dispatch job to BullMQ emailQueue
       const job = await emailQueue.add('send-email', {
         leadId: lead._id,
-        templateBody: `Hello, this is an automated outreach message for ${lead.email}`,
+        subject: subject,
+        body: body,
+        templateSubject: subject,
+        templateBody: body || `Hello, this is an automated outreach message for ${lead.email}`,
       });
       console.log(`[Serper Queue] Enqueued send-email job ${job.id} for lead ${lead._id}`);
 
@@ -169,7 +172,55 @@ const scrapeLeads = async (query) => {
   };
 };
 
+const getLeads = async () => {
+  return await Lead.find().sort({ createdAt: -1 });
+};
+
+/**
+ * Calculate lead statistics and status breakdown using MongoDB aggregation
+ * @returns {Promise<Object>} Object with totalLeads, statusBreakdown, and byStatus array
+ */
+const getLeadStats = async () => {
+  const totalLeads = await Lead.countDocuments();
+
+  const statusAgg = await Lead.aggregate([
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const defaultStatuses = ['Uncontacted', 'Queued', 'Sent', 'Bounced', 'Opened', 'Replied'];
+  const statusBreakdown = {};
+  defaultStatuses.forEach((status) => {
+    statusBreakdown[status] = 0;
+  });
+
+  statusAgg.forEach((item) => {
+    if (item._id) {
+      statusBreakdown[item._id] = item.count;
+    }
+  });
+
+  const byStatus = Object.keys(statusBreakdown).map((status) => ({
+    status,
+    count: statusBreakdown[status],
+  }));
+
+  return {
+    totalLeads,
+    statusBreakdown,
+    byStatus,
+  };
+};
+
 module.exports = {
   createLead,
   scrapeLeads,
+  getLeads,
+  getLeadStats,
 };
+
+

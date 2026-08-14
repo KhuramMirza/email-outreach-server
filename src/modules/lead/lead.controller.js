@@ -37,8 +37,8 @@ const createLeadHandler = async (req, res) => {
  */
 const scrapeLeadsHandler = async (req, res) => {
   try {
-    const { query } = req.body;
-    const result = await leadService.scrapeLeads(query);
+    const { query, subject, body } = req.body;
+    const result = await leadService.scrapeLeads(query, subject, body);
     return res.status(200).json({
       status: 'success',
       message: `Scraping completed for query: ${query}`,
@@ -52,7 +52,41 @@ const scrapeLeadsHandler = async (req, res) => {
   }
 };
 
+const getLeadsHandler = async (req, res) => {
+  try {
+    const leads = await leadService.getLeads();
+    return res.status(200).json({
+      status: 'success',
+      data: leads,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to fetch leads',
+    });
+  }
+};
+
+const getLeadStatsHandler = async (req, res) => {
+  try {
+    const stats = await leadService.getLeadStats();
+    return res.status(200).json({
+      status: 'success',
+      data: stats,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to fetch lead stats',
+    });
+  }
+};
+
 module.exports = {
   createLeadHandler,
   scrapeLeadsHandler,
+  getLeadsHandler,
+  getLeadStatsHandler,
 };
+
+

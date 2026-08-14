@@ -3,15 +3,25 @@ const { ZodError } = require('zod');
 /**
  * Express middleware to validate request body, query, and params against Zod schemas.
  * Supports:
- * - Direct Zod schema for req.body (e.g., z.object({ query: z.string() }))
+ * - Direct Zod schema for req.body (e.g., z.object({ query: z.string(), subject: z.string(), body: z.string() }))
  * - Object with target schemas e.g., { body: zSchema, query: zSchema, params: zSchema }
- * - Top-level wrapper schema e.g., z.object({ body: zSchema, query: zSchema })
+ * - Top-level wrapper Zod schema e.g., z.object({ body: zSchema, query: zSchema })
  */
 const validateRequest = (schema) => async (req, res, next) => {
   try {
-    if (schema && typeof schema.parseAsync === 'function') {
-      // Check if schema is a top-level wrapper explicitly containing a 'body' Zod shape
-      if (schema.shape && schema.shape.body && typeof schema.shape.body.parseAsync === 'function') {
+    if (!schema) return next();
+
+    if (typeof schema.parseAsync === 'function') {
+      // Check if this is a top-level wrapper Zod schema specifically wrapping { body, query, params }
+      const shapeKeys = schema.shape ? Object.keys(schema.shape) : [];
+      const isWrapperSchema =
+        shapeKeys.length > 0 &&
+        shapeKeys.every((k) => ['body', 'query', 'params'].includes(k)) &&
+        ((schema.shape.body && schema.shape.body._def && schema.shape.body._def.typeName === 'ZodObject') ||
+          (schema.shape.query && schema.shape.query._def && schema.shape.query._def.typeName === 'ZodObject') ||
+          (schema.shape.params && schema.shape.params._def && schema.shape.params._def.typeName === 'ZodObject'));
+
+      if (isWrapperSchema) {
         const parsed = await schema.parseAsync({
           body: req.body,
           query: req.query,
@@ -24,10 +34,16 @@ const validateRequest = (schema) => async (req, res, next) => {
         // Validate req.body directly against the schema
         req.body = await schema.parseAsync(req.body);
       }
-    } else if (schema && typeof schema === 'object') {
-      if (schema.body) req.body = await schema.body.parseAsync(req.body);
-      if (schema.query) req.query = await schema.query.parseAsync(req.query);
-      if (schema.params) req.params = await schema.params.parseAsync(req.params);
+    } else if (typeof schema === 'object') {
+      if (schema.body && typeof schema.body.parseAsync === 'function') {
+        req.body = await schema.body.parseAsync(req.body);
+      }
+      if (schema.query && typeof schema.query.parseAsync === 'function') {
+        req.query = await schema.query.parseAsync(req.query);
+      }
+      if (schema.params && typeof schema.params.parseAsync === 'function') {
+        req.params = await schema.params.parseAsync(req.params);
+      }
     }
     next();
   } catch (error) {
@@ -49,3 +65,4 @@ const validateRequest = (schema) => async (req, res, next) => {
 };
 
 module.exports = validateRequest;
+

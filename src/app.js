@@ -18,11 +18,12 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Email Outreach API is running' });
 });
+
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'success', message: 'API is healthy' });
 });
 
-// Modular Feature Routes (/api/leads and /api/v1/leads)
+// Modular Feature Routes (/api and /api/v1)
 app.use('/api/leads', leadRoutes);
 app.use('/api/v1/leads', leadRoutes);
 
@@ -39,3 +40,4 @@ app.use('/api/v1/senders', senderRoutes);
 app.use(errorHandler);
 
 module.exports = app;
+
