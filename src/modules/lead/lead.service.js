@@ -238,13 +238,52 @@ const trackLeadOpen = async (leadId) => {
   return null;
 };
 
+/**
+ * Create/find a test lead and enqueue a test email job in BullMQ
+ * @param {string} email
+ * @param {string} subject
+ * @param {string} body
+ * @returns {Promise<Object>} Object with lead document and queued jobId
+ */
+const sendTestEmail = async (email, subject, body) => {
+  const cleanEmail = email.toLowerCase().trim();
+  let lead = await Lead.findOne({ email: cleanEmail });
+
+  if (!lead) {
+    lead = await createLead({
+      email: cleanEmail,
+      niche: 'Manual Test',
+      companyName: 'Test Account',
+      status: 'Uncontacted',
+    });
+  }
+
+  const job = await emailQueue.add('send-email', {
+    leadId: lead._id,
+    recipientEmail: cleanEmail,
+    subject: subject,
+    body: body,
+    templateSubject: subject,
+    templateBody: body,
+  });
+
+  console.log(`[Manual Test] Enqueued test email job ${job.id} for lead ${lead._id} (${cleanEmail})`);
+
+  return {
+    lead,
+    jobId: job.id,
+  };
+};
+
 module.exports = {
   createLead,
   scrapeLeads,
   getLeads,
   getLeadStats,
   trackLeadOpen,
+  sendTestEmail,
 };
+
 
 
 

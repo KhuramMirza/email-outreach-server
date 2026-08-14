@@ -16,8 +16,15 @@ const scrapeLeadsSchema = z.object({
   body: z.string({ required_error: 'Body is required' }).min(1, 'Body cannot be empty'),
 });
 
+const testEmailSchema = z.object({
+  email: z.string({ required_error: 'Target email is required' }).email('Invalid email format'),
+  subject: z.string({ required_error: 'Subject is required' }).min(1, 'Subject cannot be empty'),
+  body: z.string({ required_error: 'Body is required' }).min(1, 'Body cannot be empty'),
+});
 
 module.exports = {
   createLeadSchema,
   scrapeLeadsSchema,
+  testEmailSchema,
 };
+

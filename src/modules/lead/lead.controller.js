@@ -108,13 +108,38 @@ const trackEmailOpenHandler = async (req, res) => {
   return res.status(200).send(pixelBuffer);
 };
 
+/**
+ * Controller handler to trigger a manual test email
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+const sendTestEmailHandler = async (req, res) => {
+  try {
+    const { email, subject, body } = req.body;
+    const result = await leadService.sendTestEmail(email, subject, body);
+
+    return res.status(201).json({
+      status: 'success',
+      message: `Test email queued successfully for ${email}`,
+      data: result,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to queue test email',
+    });
+  }
+};
+
 module.exports = {
   createLeadHandler,
   scrapeLeadsHandler,
   getLeadsHandler,
   getLeadStatsHandler,
   trackEmailOpenHandler,
+  sendTestEmailHandler,
 };
+
 
 
 
