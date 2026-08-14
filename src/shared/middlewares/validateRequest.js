@@ -2,15 +2,16 @@ const { ZodError } = require('zod');
 
 /**
  * Express middleware to validate request body, query, and params against Zod schemas.
- * Accepts either:
- * - A Zod schema for req.body directly
- * - An object containing individual Zod schemas { body, query, params }
- * - A Zod schema validating { body, query, params }
+ * Supports:
+ * - Direct Zod schema for req.body (e.g., z.object({ query: z.string() }))
+ * - Object with target schemas e.g., { body: zSchema, query: zSchema, params: zSchema }
+ * - Top-level wrapper schema e.g., z.object({ body: zSchema, query: zSchema })
  */
 const validateRequest = (schema) => async (req, res, next) => {
   try {
     if (schema && typeof schema.parseAsync === 'function') {
-      if (schema.shape && (schema.shape.body || schema.shape.query || schema.shape.params)) {
+      // Check if schema is a top-level wrapper explicitly containing a 'body' Zod shape
+      if (schema.shape && schema.shape.body && typeof schema.shape.body.parseAsync === 'function') {
         const parsed = await schema.parseAsync({
           body: req.body,
           query: req.query,
@@ -20,6 +21,7 @@ const validateRequest = (schema) => async (req, res, next) => {
         if (parsed.query !== undefined) req.query = parsed.query;
         if (parsed.params !== undefined) req.params = parsed.params;
       } else {
+        // Validate req.body directly against the schema
         req.body = await schema.parseAsync(req.body);
       }
     } else if (schema && typeof schema === 'object') {

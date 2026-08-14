@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 
-const leadRoutes = require('./modules/lead/lead.routes');
+const leadRoutes = require('./modules/lead/lead.route');
 const campaignRoutes = require('./modules/campaign/campaign.routes');
 const templateRoutes = require('./modules/template/template.routes');
 const senderRoutes = require('./modules/sender/sender.routes');
@@ -14,15 +14,25 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Check Route
+// Health Check Routes
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Email Outreach API is running' });
 });
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'success', message: 'API is healthy' });
+});
 
-// Modular Feature Routes
+// Modular Feature Routes (/api/leads and /api/v1/leads)
+app.use('/api/leads', leadRoutes);
 app.use('/api/v1/leads', leadRoutes);
+
+app.use('/api/campaigns', campaignRoutes);
 app.use('/api/v1/campaigns', campaignRoutes);
+
+app.use('/api/templates', templateRoutes);
 app.use('/api/v1/templates', templateRoutes);
+
+app.use('/api/senders', senderRoutes);
 app.use('/api/v1/senders', senderRoutes);
 
 // Global Error Handler
