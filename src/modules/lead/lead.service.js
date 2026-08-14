@@ -173,8 +173,9 @@ const scrapeLeads = async (query, subject, body) => {
 };
 
 const getLeads = async () => {
-  return await Lead.find().sort({ createdAt: -1 });
+  return await Lead.find().sort({ updatedAt: -1, createdAt: -1 });
 };
+
 
 /**
  * Calculate lead statistics and status breakdown using MongoDB aggregation
