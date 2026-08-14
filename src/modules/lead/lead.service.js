@@ -252,8 +252,12 @@ const sendTestEmail = async (email, subject, body) => {
       email: cleanEmail,
       niche: 'Manual Test',
       companyName: 'Test Account',
-      status: 'Uncontacted',
+      status: 'Queued',
     });
+    await lead.save();
+  } else {
+    lead.status = 'Queued';
+    if (!lead.niche) lead.niche = 'Manual Test';
     await lead.save();
   }
 
@@ -273,6 +277,7 @@ const sendTestEmail = async (email, subject, body) => {
     jobId: job.id,
   };
 };
+
 
 module.exports = {
   createLead,
