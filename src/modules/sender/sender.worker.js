@@ -69,6 +69,14 @@ const emailWorker = new Worker(
         .replace(/\{\{\s*website\s*\}\}/gi, websiteVal);
     }
 
+    // Inject 1x1 Open Tracking Pixel Image
+    const targetLeadId = leadId || (lead ? lead._id.toString() : null);
+    if (targetLeadId) {
+      const apiBaseUrl = process.env.API_URL || 'http://localhost:5000/api';
+      const trackingPixelTag = `<img src="${apiBaseUrl}/leads/${targetLeadId}/track" width="1" height="1" style="display:none;" />`;
+      mailContent += trackingPixelTag;
+    }
+
     // Prepare email options
     const mailOptions = {
       from: VERIFIED_SENDER_EMAIL,

@@ -82,11 +82,39 @@ const getLeadStatsHandler = async (req, res) => {
   }
 };
 
+/**
+ * 1x1 Transparent GIF Tracking Pixel Handler
+ * Updates lead status to 'Opened' and returns 1x1 image/gif
+ */
+const trackEmailOpenHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (id) {
+      await leadService.trackLeadOpen(id);
+    }
+  } catch (err) {
+    console.error('[Tracking Pixel Controller Error]', err.message);
+  }
+
+  // 1x1 Transparent GIF Buffer
+  const pixelBuffer = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+
+  res.setHeader('Content-Type', 'image/gif');
+  res.setHeader('Content-Length', pixelBuffer.length);
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  return res.status(200).send(pixelBuffer);
+};
+
 module.exports = {
   createLeadHandler,
   scrapeLeadsHandler,
   getLeadsHandler,
   getLeadStatsHandler,
+  trackEmailOpenHandler,
 };
+
 
 

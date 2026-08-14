@@ -216,11 +216,35 @@ const getLeadStats = async () => {
   };
 };
 
+/**
+ * Record an email open event for a lead by updating status to 'Opened'
+ * @param {string} leadId
+ * @returns {Promise<Object|null>} Updated lead document
+ */
+const trackLeadOpen = async (leadId) => {
+  try {
+    const lead = await Lead.findById(leadId);
+    if (lead) {
+      if (lead.status === 'Sent' || lead.status === 'Uncontacted' || lead.status === 'Queued') {
+        lead.status = 'Opened';
+        await lead.save();
+        console.log(`[Open Tracker] Lead ${leadId} (${lead.email}) status updated to 'Opened'`);
+      }
+      return lead;
+    }
+  } catch (err) {
+    console.error(`[Open Tracker Error] Failed to update lead ${leadId}:`, err.message);
+  }
+  return null;
+};
+
 module.exports = {
   createLead,
   scrapeLeads,
   getLeads,
   getLeadStats,
+  trackLeadOpen,
 };
+
 
 
