@@ -14,31 +14,90 @@ const createLead = async (leadData) => {
 };
 
 /**
- * Scrape leads by search query (mocking Google search with 3 target URLs)
+ * Filter out generic social networks, video platforms, and massive directory domains
+ * @param {string} url
+ * @returns {boolean} True if the URL is a valid target website, false if generic
+ */
+const isTargetWebsite = (url) => {
+  const genericDomains = [
+    'facebook.com',
+    'linkedin.com',
+    'twitter.com',
+    'x.com',
+    'instagram.com',
+    'youtube.com',
+    'pinterest.com',
+    'yelp.com',
+    'wikipedia.org',
+    'amazon.com',
+    'reddit.com',
+    'glassdoor.com',
+  ];
+
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return !genericDomains.some((domain) => hostname.includes(domain));
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Scrape leads by search query using Serper API (Google Search)
  * @param {string} query - Search term / niche
  * @returns {Promise<Object>} Scraping summary & created leads
  */
 const scrapeLeads = async (query) => {
-  console.log(`[Scraper] Starting automated lead generation for query: "${query}"...`);
+  console.log(`[Serper Scraper] Initiating Google search via Serper API for query: "${query}"...`);
 
-  // Mock Google Search: Array of 3 target URLs containing public email addresses / test HTML
-  const mockTargetUrls = [
-    'https://www.w3.org/community/about/',
-    'https://www.apache.org/foundation/contact.html',
-    'https://httpbin.org/html',
-  ];
-
+  const targetUrls = [];
   const foundEmailMap = new Map(); // Map email -> targetUrl
   const createdLeads = [];
   const errors = [];
 
+  // Step 1: Query Serper API (Google Search)
+  try {
+    const apiKey = process.env.SERPER_API_KEY;
+    if (!apiKey) {
+      throw new Error('SERPER_API_KEY environment variable is not defined.');
+    }
+
+    const serperResponse = await axios.post(
+      'https://google.serper.dev/search',
+      { q: query },
+      {
+        headers: {
+          'X-API-KEY': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      }
+    );
+
+    const organicResults = serperResponse.data.organic || [];
+    console.log(`[Serper Scraper] Received ${organicResults.length} organic search results from Serper.`);
+
+    // Step 2: Extract link properties and filter out generic/social domains
+    organicResults.forEach((result) => {
+      if (result.link && isTargetWebsite(result.link)) {
+        targetUrls.push(result.link);
+      }
+    });
+
+    console.log(`[Serper Scraper] Extracted ${targetUrls.length} targeted websites after filtering.`);
+  } catch (err) {
+    const errMsg = `Serper API Search Failed: ${err.response ? JSON.stringify(err.response.data) : err.message}`;
+    console.error(`[Serper Scraper Error] ${errMsg}`);
+    errors.push(errMsg);
+  }
+
   // Regex to extract valid email addresses excluding common image/asset extensions
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(?!png|jpg|jpeg|gif|svg|webp|bmp|css|js|ico)[a-zA-Z]{2,}/gi;
 
-  // Step 1: Fetch HTML via Axios & Parse via Cheerio for each URL
-  for (const url of mockTargetUrls) {
+  // Step 3: Fetch HTML via Axios & Parse via Cheerio for each target URL
+  for (const url of targetUrls) {
     try {
-      console.log(`[Scraper] Fetching HTML from target website: ${url}`);
+      console.log(`[Serper Scraper] Crawling target website: ${url}`);
       const response = await axios.get(url, {
         headers: {
           'User-Agent':
@@ -62,56 +121,47 @@ const scrapeLeads = async (query) => {
         });
       }
     } catch (err) {
-      console.error(`[Scraper Error] Failed to fetch or parse ${url}: ${err.message}`);
+      console.error(`[Serper Scraper Error] Failed to crawl ${url}: ${err.message}`);
       errors.push(`Failed URL ${url}: ${err.message}`);
     }
   }
 
-  // Fallback mock email generation if live sites yield no emails in offline/sandboxed environments
-  if (foundEmailMap.size === 0) {
-    console.log('[Scraper] Using mock fallback emails for query testing...');
-    const slug = query ? query.toLowerCase().replace(/[^a-z0-9]/g, '') : 'outreach';
-    foundEmailMap.set(`contact@${slug}-lead1.com`, mockTargetUrls[0]);
-    foundEmailMap.set(`sales@${slug}-lead2.com`, mockTargetUrls[1]);
-    foundEmailMap.set(`info@${slug}-lead3.com`, mockTargetUrls[2]);
-  }
-
-  // Step 2: For every unique email found, log, save to MongoDB via createLead, and push to Queue
+  // Step 4: Save unique emails to MongoDB via createLead and dispatch to BullMQ emailQueue
   for (const [email, websiteUrl] of foundEmailMap.entries()) {
-    console.log(`[Scraper] Unique email found: ${email}`);
+    console.log(`[Serper Scraper] Unique email discovered: ${email}`);
     try {
       let lead = await Lead.findOne({ email });
 
       if (!lead) {
-        // Save new lead to MongoDB via existing createLead function
+        // Save new lead to MongoDB via createLead
         lead = await createLead({
           email,
           website: websiteUrl,
           niche: query || 'General',
           status: 'Uncontacted',
         });
-        console.log(`[Scraper] Saved lead to MongoDB with ID: ${lead._id}`);
+        console.log(`[Serper Scraper] Saved new lead to MongoDB with ID: ${lead._id}`);
       } else {
-        console.log(`[Scraper] Lead ${email} already exists in DB (ID: ${lead._id}). Enqueuing email job...`);
+        console.log(`[Serper Scraper] Lead ${email} already exists in DB (ID: ${lead._id}). Dispatching email job...`);
       }
 
-      // Push job to BullMQ emailQueue
+      // Dispatch job to BullMQ emailQueue
       const job = await emailQueue.add('send-email', {
         leadId: lead._id,
         templateBody: `Hello, this is an automated outreach message for ${lead.email}`,
       });
-      console.log(`[Scraper Queue] Successfully added send-email job ${job.id} for lead ${lead._id}`);
+      console.log(`[Serper Queue] Enqueued send-email job ${job.id} for lead ${lead._id}`);
 
       createdLeads.push({ lead, jobId: job.id });
     } catch (err) {
-      console.error(`[Scraper Error] Failed saving or queuing lead for ${email}: ${err.message}`);
+      console.error(`[Serper Scraper Error] Failed saving/queuing lead for ${email}: ${err.message}`);
       errors.push(`Lead ${email}: ${err.message}`);
     }
   }
 
   return {
     query,
-    totalUrlsProcessed: mockTargetUrls.length,
+    totalSearchPages: targetUrls.length,
     uniqueEmailsFound: foundEmailMap.size,
     processedLeadsCount: createdLeads.length,
     leads: createdLeads,
