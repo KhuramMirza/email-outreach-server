@@ -246,24 +246,24 @@ const trackLeadOpen = async (leadId) => {
  */
 const sendTestEmail = async (email, subject, body) => {
   const cleanEmail = email.toLowerCase().trim();
-  let lead = await Lead.findOne({ email: cleanEmail });
 
-  if (!lead) {
-    lead = new Lead({
-      email: cleanEmail,
-      niche: 'Manual Test',
-      companyName: 'Test Account',
-      status: 'Queued',
-    });
-    await lead.save();
-  } else {
-    lead.status = 'Queued';
-    if (!lead.niche) lead.niche = 'Manual Test';
-    await lead.save();
-  }
+  // Atomically upsert the test lead document in MongoDB and touch updatedAt
+  const lead = await Lead.findOneAndUpdate(
+    { email: cleanEmail },
+    {
+      $set: {
+        email: cleanEmail,
+        status: 'Queued',
+        niche: 'Manual Test',
+        companyName: 'Test Account',
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
 
   const job = await emailQueue.add('send-email', {
-    leadId: lead._id,
+    leadId: lead._id.toString(),
     recipientEmail: cleanEmail,
     subject: subject,
     body: body,
@@ -271,13 +271,14 @@ const sendTestEmail = async (email, subject, body) => {
     templateBody: body,
   });
 
-  console.log(`[Manual Test] Saved lead ${lead._id} and enqueued test email job ${job.id} for ${cleanEmail}`);
+  console.log(`[Manual Test] Saved/updated lead ${lead._id} in MongoDB and enqueued test email job ${job.id} for ${cleanEmail}`);
 
   return {
     lead,
     jobId: job.id,
   };
 };
+
 
 
 module.exports = {
